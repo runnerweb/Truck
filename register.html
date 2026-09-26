@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>용차 매칭 | 회원가입</title>
+<style>
+  :root{
+    --navy-900:#0F1826;
+    --navy-800:#16223A;
+    --navy-700:#1E2E4D;
+    --amber:#E8A33D;
+    --amber-dark:#C6852A;
+    --paper:#F7F6F2;
+    --ink:#1C2333;
+    --muted:#7A8296;
+    --line:#E4E1D8;
+    --danger:#C1443D;
+    --success:#2F6F5E;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    display:flex;
+    min-height:100vh;
+  }
+
+  .brand{
+    position:relative;
+    flex:1 1 42%;
+    background:linear-gradient(160deg, var(--navy-900) 0%, var(--navy-700) 100%);
+    color:#fff;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding:56px 48px;
+    overflow:hidden;
+    min-width:0;
+  }
+  .brand-top{position:relative;z-index:2;}
+  .brand-eyebrow{
+    font-size:12px; letter-spacing:.14em; color:var(--amber); font-weight:700; margin-bottom:18px;
+  }
+  .brand-title{
+    font-size:30px; font-weight:800; line-height:1.4; letter-spacing:-0.02em; margin:0 0 14px;
+  }
+  .brand-sub{ font-size:14px; color:#B9C2D6; line-height:1.75; max-width:340px; }
+
+  .steps{ position:relative; z-index:2; margin-top:36px; display:flex; flex-direction:column; gap:16px; }
+  .step{ display:flex; gap:12px; align-items:flex-start; }
+  .step-dot{
+    width:22px; height:22px; border-radius:50%;
+    background:rgba(255,255,255,.08); border:1.5px solid #3A4C74;
+    color:#B9C2D6; font-size:11px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; flex:none;
+  }
+  .step-text{ font-size:13px; color:#C5CCDD; line-height:1.6; padding-top:1px; }
+  .step-text b{ color:#fff; }
+
+  .brand-footer{ position:relative; z-index:2; font-size:12px; color:#6E7A94; }
+
+  .brand::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size:34px 34px;
+    z-index:1;
+  }
+
+  .form-panel{
+    flex:1 1 58%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:40px 24px;
+  }
+  .form-card{ width:100%; max-width:420px; }
+  .form-card h1{ font-size:22px; font-weight:800; margin:0 0 6px; letter-spacing:-0.01em; }
+  .form-card .desc{ font-size:13.5px; color:var(--muted); margin:0 0 28px; }
+
+  .role-toggle{
+    display:flex; background:#ECEAE2; border-radius:10px; padding:4px; margin-bottom:24px;
+  }
+  .role-toggle button{
+    flex:1; border:none; background:transparent; padding:10px 0;
+    font-size:13.5px; font-weight:700; color:var(--muted);
+    border-radius:7px; cursor:pointer; transition:all .15s ease;
+  }
+  .role-toggle button.active{ background:var(--navy-900); color:#fff; }
+
+  label{ display:block; font-size:12.5px; font-weight:700; color:var(--ink); margin:0 0 6px; }
+  .field{ margin-bottom:16px; }
+  .field-row{ display:flex; gap:10px; }
+  .field-row .field{ flex:1; }
+  .id-row{ display:flex; gap:8px; }
+  .id-row input{ flex:1; }
+
+  input[type=text], input[type=password], input[type=tel]{
+    width:100%; padding:12px 14px; border:1.5px solid var(--line); border-radius:9px;
+    font-size:14.5px; background:#fff; color:var(--ink); outline:none;
+    transition:border-color .15s ease;
+  }
+  input:focus{ border-color:var(--amber-dark); }
+
+  .btn-check{
+    padding:0 14px; border:1.5px solid var(--line); background:#fff;
+    border-radius:9px; font-size:12.5px; font-weight:700; color:var(--navy-900);
+    cursor:pointer; white-space:nowrap;
+  }
+  .btn-check:hover{ border-color:var(--navy-900); }
+  .hint{ font-size:11.5px; margin-top:5px; color:var(--muted); }
+  .hint.ok{ color:var(--success); }
+  .hint.bad{ color:var(--danger); }
+
+  .btn-primary{
+    width:100%; padding:13px 0; margin-top:8px; background:var(--navy-900); color:#fff;
+    border:none; border-radius:9px; font-size:15px; font-weight:700; cursor:pointer;
+    transition:background .15s ease, transform .05s ease;
+  }
+  .btn-primary:hover{ background:var(--navy-700); }
+  .btn-primary:active{ transform:translateY(1px); }
+  .btn-primary:disabled{ background:#B7BDCB; cursor:not-allowed; }
+
+  .msg{ margin-top:14px; font-size:13px; padding:10px 12px; border-radius:8px; display:none; }
+  .msg.error{ display:block; background:#FBEAE8; color:var(--danger); }
+  .msg.success{ display:block; background:#E9F2EE; color:var(--success); }
+
+  .bottom-link{ margin-top:22px; text-align:center; font-size:13px; color:var(--muted); }
+  .bottom-link a{ color:var(--navy-900); font-weight:700; text-decoration:none; }
+  .bottom-link a:hover{ text-decoration:underline; }
+
+  @media (max-width:860px){
+    body{ flex-direction:column; }
+    .brand{ flex:none; padding:36px 28px; }
+    .brand-title{ font-size:24px; }
+    .form-panel{ padding:32px 20px 60px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="brand">
+    <div class="brand-top">
+      <div class="brand-eyebrow">RUNNER · 용차 매칭</div>
+      <h1 class="brand-title">가입은 3분,<br>승인 후 바로<br>매칭이 시작됩니다</h1>
+      <p class="brand-sub">기사님과 화주님 모두 같은 곳에서<br>가입하고 관리자 승인을 받습니다.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-dot">1</div>
+        <div class="step-text"><b>유형 선택</b> — 용차 기사 또는 일거리 등록(화주)</div>
+      </div>
+      <div class="step">
+        <div class="step-dot">2</div>
+        <div class="step-text"><b>정보 입력</b> — 아이디·비밀번호·이름·연락처</div>
+      </div>
+      <div class="step">
+        <div class="step-dot">3</div>
+        <div class="step-text"><b>관리자 승인</b> — 승인 완료 후 로그인 가능</div>
+      </div>
+    </div>
+
+    <div class="brand-footer">© 러너로지스 · 용차 관리 시스템</div>
+  </div>
+
+  <div class="form-panel">
+    <div class="form-card">
+      <h1>회원가입</h1>
+      <p class="desc">가입 유형을 선택하고 정보를 입력해 주세요.</p>
+
+      <div class="role-toggle">
+        <button type="button" class="active" data-role="기사">용차 기사</button>
+        <button type="button" data-role="화주">일거리 등록(화주)</button>
+      </div>
+
+      <form id="registerForm">
+        <div class="field">
+          <label for="id">아이디</label>
+          <div class="id-row">
+            <input type="text" id="id" autocomplete="username" required>
+            <button type="button" class="btn-check" id="checkIdBtn">중복확인</button>
+          </div>
+          <div class="hint" id="idHint"></div>
+        </div>
+
+        <div class="field">
+          <label for="password">비밀번호</label>
+          <input type="password" id="password" autocomplete="new-password" required>
+          <div class="hint">4자 이상 입력하세요.</div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="name">이름</label>
+            <input type="text" id="name" required>
+          </div>
+          <div class="field">
+            <label for="phone">연락처</label>
+            <input type="tel" id="phone" placeholder="010-0000-0000" required>
+          </div>
+        </div>
+
+        <div id="bankSection">
+          <div class="field-row">
+            <div class="field">
+              <label for="bankName">은행명</label>
+              <input type="text" id="bankName" placeholder="예: 국민은행">
+            </div>
+            <div class="field">
+              <label for="accountNumber">계좌번호</label>
+              <input type="text" id="accountNumber" placeholder="- 없이 숫자만">
+            </div>
+          </div>
+          <div class="field">
+            <label for="accountHolder">예금주</label>
+            <input type="text" id="accountHolder" placeholder="예금주명">
+          </div>
+          <div class="hint">용차 대금 입금에 사용되는 계좌입니다. 용차 기사 계정만 입력합니다.</div>
+        </div>
+
+        <button type="submit" class="btn-primary" id="submitBtn">가입 신청</button>
+      </form>
+
+      <div class="msg" id="msgBox"></div>
+
+      <div class="bottom-link">
+        이미 계정이 있으신가요? <a href="login.html">로그인</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ⚠️ Apps Script 웹앱 배포 후 나오는 URL로 반드시 교체하세요.
+  const API_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+
+  let selectedRole = "기사";
+  let idChecked = false;
+  let idCheckedValue = "";
+
+  const bankSection = document.getElementById("bankSection");
+
+  function updateBankSectionVisibility(){
+    bankSection.style.display = selectedRole === "기사" ? "block" : "none";
+  }
+  updateBankSectionVisibility();
+
+  document.querySelectorAll(".role-toggle button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(".role-toggle button").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedRole = btn.dataset.role;
+      updateBankSectionVisibility();
+    });
+  });
+
+  const idInput = document.getElementById("id");
+  const idHint = document.getElementById("idHint");
+  idInput.addEventListener("input", ()=>{
+    idChecked = false;
+    idHint.textContent = "";
+    idHint.className = "hint";
+  });
+
+  document.getElementById("checkIdBtn").addEventListener("click", async ()=>{
+    const id = idInput.value.trim();
+    if(!id){
+      idHint.textContent = "아이디를 먼저 입력하세요.";
+      idHint.className = "hint bad";
+      return;
+    }
+    idHint.textContent = "확인 중...";
+    idHint.className = "hint";
+    try{
+      const res = await fetch(API_URL, {
+        method:"POST",
+        body: JSON.stringify({ action:"checkId", id })
+      });
+      const data = await res.json();
+      if(data.ok && !data.duplicate){
+        idChecked = true;
+        idCheckedValue = id;
+        idHint.textContent = "사용 가능한 아이디입니다.";
+        idHint.className = "hint ok";
+      } else if(data.ok && data.duplicate){
+        idChecked = false;
+        idHint.textContent = "이미 사용 중인 아이디입니다.";
+        idHint.className = "hint bad";
+      } else {
+        idHint.textContent = data.message || "확인 중 오류가 발생했습니다.";
+        idHint.className = "hint bad";
+      }
+    } catch(err){
+      idHint.textContent = "서버와 통신 중 오류가 발생했습니다. API_URL 설정을 확인하세요.";
+      idHint.className = "hint bad";
+    }
+  });
+
+  const form = document.getElementById("registerForm");
+  const msgBox = document.getElementById("msgBox");
+  const submitBtn = document.getElementById("submitBtn");
+
+  function showMsg(text, type){
+    msgBox.textContent = text;
+    msgBox.className = "msg " + type;
+  }
+
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const id = idInput.value.trim();
+    const password = document.getElementById("password").value;
+    const name = document.getElementById("name").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    const bankName = document.getElementById("bankName").value.trim();
+    const accountNumber = document.getElementById("accountNumber").value.trim();
+    const accountHolder = document.getElementById("accountHolder").value.trim();
+
+    if(!id || !password || !name || !phone){
+      showMsg("모든 항목을 입력하세요.", "error");
+      return;
+    }
+    if(password.length < 4){
+      showMsg("비밀번호는 4자 이상이어야 합니다.", "error");
+      return;
+    }
+    if(selectedRole === "기사" && (!bankName || !accountNumber || !accountHolder)){
+      showMsg("입금 계좌 정보(은행명/계좌번호/예금주)를 모두 입력하세요.", "error");
+      return;
+    }
+    if(!idChecked || idCheckedValue !== id){
+      showMsg("아이디 중복확인을 먼저 진행하세요.", "error");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "가입 신청 중...";
+
+    try{
+      const res = await fetch(API_URL, {
+        method:"POST",
+        body: JSON.stringify({
+          action:"register", id, password, role:selectedRole, name, phone,
+          bankName, accountNumber, accountHolder
+        })
+      });
+      const data = await res.json();
+
+      if(data.ok){
+        showMsg(data.message || "가입 신청이 완료되었습니다.", "success");
+        form.reset();
+        idChecked = false;
+      } else {
+        showMsg(data.message || "가입 신청에 실패했습니다.", "error");
+      }
+    } catch(err){
+      showMsg("서버와 통신 중 오류가 발생했습니다. API_URL 설정을 확인하세요.", "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "가입 신청";
+    }
+  });
+</script>
+
+</body>
+</html>
