@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1826">
+<title>관리자</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .container.wide{max-width:1040px;}
+  .seg{display:flex;background:#ECEAE2;border-radius:10px;padding:4px;margin-bottom:12px;}
+  .seg button{flex:1;border:none;background:transparent;padding:10px 4px;font-size:13.5px;font-weight:700;color:#7A8296;border-radius:7px;cursor:pointer;}
+  .seg button.on{background:#0F1826;color:#fff;}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:14px;}
+  .stat{background:#fff;border:1px solid #E4E1D8;border-radius:12px;padding:10px 12px;}
+  .stat b{display:block;font-size:20px;font-weight:800;}
+  .stat span{font-size:11.5px;color:#7A8296;font-weight:600;}
+  .stat.warn b{color:#C6852A;}
+  .tools{display:flex;gap:8px;margin-bottom:12px;}
+  .tools input{flex:1;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+  .grid .card{margin:0;}
+  .adm-card{cursor:pointer;}
+  .adm-card:hover{border-color:#C6852A;}
+  .adm-actions{display:flex;gap:8px;margin-top:12px;}
+  .adm-actions .btn{flex:1;}
+  .tag.ok{background:#E4F0EB;color:#2F6F5E;} .tag.wait{background:#FBF1DC;color:#C6852A;} .tag.block{background:#FBEAE8;color:#C1443D;}
+  .tag.admin{background:#0F1826;color:#fff;} .tag.cancel{background:#ECEAE2;color:#7A8296;}
+  .form2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;}
+  .form2 .full{grid-column:1 / -1;}
+  .m-actions.wrap{flex-wrap:wrap;} .m-actions.wrap .btn{flex:1 1 45%;}
+  .log-row{display:flex;gap:10px;justify-content:space-between;font-size:13px;padding:9px 0;border-bottom:1px solid #E4E1D8;}
+  .log-row:last-child{border-bottom:none;}
+  @media (max-width:520px){.form2{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<main class="container wide">
+  <div class="stats" id="stats"></div>
+
+  <div class="seg" id="tabs">
+    <button type="button" class="on" data-t="users">회원</button>
+    <button type="button" data-t="jobs">용차일</button>
+    <button type="button" data-t="reqs">의뢰</button>
+    <button type="button" data-t="logs">로그인기록</button>
+  </div>
+
+  <div class="tools">
+    <input type="text" id="q" placeholder="검색 (아이디 · 이름 · 캠프 · 연락처 ...)">
+    <button class="btn btn-ghost" id="refresh">새로고침</button>
+  </div>
+
+  <div id="body"><div class="empty">불러오는 중...</div></div>
+</main>
+
+<script src="common.js"></script>
+<script>
+  const $ = function(id){ return document.getElementById(id); };
+  const S = { tab: 'users', users: [], jobs: [], reqs: [], logs: [], stats: null };
+  const STATUS_CLS = { '승인': 'ok', '승인대기': 'wait', '차단': 'block', '모집중': 'wait', '매칭완료': 'ok', '취소': 'cancel', '대기': 'wait', '수락': 'ok', '거절': 'block', '성공': 'ok', '실패': 'block' };
+  function stag(t){ return '<span class="tag ' + (STATUS_CLS[t] || '') + '">' + esc(t || '-') + '</span>'; }
+
+  (async function init(){
+    if(!requireLogin()) return;
+    renderAppbar({ title: '관리자', back: true });
+    try {
+      const me = await api('me');
+      setSession(getToken(), me.user);
+      if(!me.user.isAdmin){ toast('관리자만 접근할 수 있습니다.', 'err'); setTimeout(function(){ location.replace('home.html'); }, 800); return; }
+    } catch(e){ return; }
+    $('tabs').addEventListener('click', function(e){
+      const b = e.target.closest('button[data-t]'); if(!b) return;
+      S.tab = b.dataset.t;
+      Array.prototype.forEach.call($('tabs').children, function(x){ x.classList.toggle('on', x === b); });
+      $('q').value = '';
+      load();
+    });
+    $('q').addEventListener('input', render);
+    $('refresh').addEventListener('click', load);
+    load();
+  })();
+
+  async function load(){
+    $('body').innerHTML = '<div class="empty">불러오는 중...</div>';
+    try {
+      if(S.tab === 'users'){ const r = await api('adminUsers'); S.users = r.users; S.stats = r.stats; }
+      else if(S.tab === 'jobs'){ S.jobs = (await api('adminJobs')).jobs; }
+      else if(S.tab === 'reqs'){ S.reqs = (await api('adminRequests')).requests; }
+      else { S.logs = (await api('adminLogs')).logs; }
+      if(!S.stats){ try { S.stats = (await api('adminUsers')).stats; } catch(e){} }
+      render();
+    } catch(e){ $('body').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+  }
+
+  function renderStats(){
+    const s = S.stats; if(!s){ $('stats').innerHTML = ''; return; }
+    const items = [['전체 회원', s.users], ['승인 대기', s.pending, s.pending > 0], ['차단', s.blocked], ['관리자', s.admins], ['모집중 용차일', s.open], ['매칭 완료', s.matched]];
+    $('stats').innerHTML = items.map(function(x){ return '<div class="stat' + (x[2] ? ' warn' : '') + '"><b>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join('');
+  }
+
+  function match(obj){
+    const q = $('q').value.trim().toLowerCase();
+    return !q || Object.keys(obj).some(function(k){ return String(obj[k]).toLowerCase().indexOf(q) >= 0; });
+  }
+
+  function render(){
+    renderStats();
+    const t = S.tab;
+    let html = '';
+    if(t === 'users'){
+      const rows = S.users.filter(function(u){ return match({ a:u.id, b:u.name, c:u.qfId, d:u.phone, e:u.camp, f:u.route, g:u.status }); });
+      html = rows.length ? '<div class="grid">' + rows.map(userCard).join('') + '</div>' : '<div class="empty">회원이 없습니다.</div>';
+    } else if(t === 'jobs'){
+      const rows = S.jobs.filter(function(j){ return match({ a:j.owner, b:j.matched, c:j.camp, d:j.route, e:j.date, f:j.status, g:j.shift }); });
+      html = rows.length ? '<div class="grid">' + rows.map(jobCard).join('') + '</div>' : '<div class="empty">용차일이 없습니다.</div>';
+    } else if(t === 'reqs'){
+      const rows = S.reqs.filter(function(r){ return match(r); });
+      html = rows.length ? '<div class="card">' + rows.map(function(r){
+        return '<div class="log-row"><div><b>@' + esc(r.requester) + '</b> → @' + esc(r.owner) + '<div class="muted small">' + esc(r.date ? kdate(r.date) : '-') + ' ' + esc(r.shift) + ' · ' + esc(r.camp) + ' ' + esc(r.route) + '</div></div>' +
+               '<div style="text-align:right">' + stag(r.status) + '<div class="muted small">' + esc(fmtTime(r.created)) + '</div></div></div>';
+      }).join('') + '</div>' : '<div class="empty">의뢰가 없습니다.</div>';
+    } else {
+      const rows = S.logs.filter(function(l){ return match(l); });
+      html = rows.length ? '<div class="card">' + rows.map(function(l){
+        return '<div class="log-row"><div><b>@' + esc(l.id) + '</b>' + (l.note ? '<div class="muted small">' + esc(l.note) + '</div>' : '') + '</div>' +
+               '<div style="text-align:right">' + stag(l.result) + '<div class="muted small">' + esc(fmtTime(l.time)) + '</div></div></div>';
+      }).join('') + '</div>' : '<div class="empty">기록이 없습니다.</div>';
+    }
+    $('body').innerHTML = html;
+  }
+
+  function userCard(u){
+    return '<div class="card adm-card" data-user="' + esc(u.id) + '">' +
+      '<div class="jc-top"><div class="jc-id"><span class="avatar">' + esc(u.id.charAt(0).toUpperCase()) + '</span>@' + esc(u.id) + '</div>' +
+      '<div>' + (u.role === '관리자' ? '<span class="tag admin">관리자</span> ' : '') + stag(u.status) + '</div></div>' +
+      '<div class="detail-rows">' +
+      '<div class="jc-row"><b>이름</b><span>' + esc(u.name) + '</span></div>' +
+      '<div class="jc-row"><b>연락처</b><span>' + esc(u.phone) + '</span></div>' +
+      '<div class="jc-row"><b>캠프</b><span>' + esc(u.camp) + ' · ' + esc(u.route) + '</span></div>' +
+      '<div class="jc-row"><b>최근접속</b><span>' + esc(u.lastLogin ? fmtTime(u.lastLogin) : '-') + '</span></div></div>' +
+      '<div class="adm-actions">' +
+      (u.status === '승인대기' ? '<button class="btn btn-ok btn-sm" data-approve="' + esc(u.id) + '">승인</button>' : '') +
+      '<button class="btn btn-ghost btn-sm" data-edit="' + esc(u.id) + '">수정</button></div></div>';
+  }
+
+  function jobCard(j){
+    return '<div class="card adm-card" data-job="' + esc(j.sid) + '">' +
+      '<div class="jc-top"><div class="sch-date" style="font-size:16px;font-weight:800">' + esc(kdate(j.date)) + '</div><div>' + shiftTag(j.shift) + ' ' + stag(j.status) + '</div></div>' +
+      '<div class="detail-rows">' +
+      '<div class="jc-row"><b>등록자</b><span>@' + esc(j.owner) + '</span></div>' +
+      '<div class="jc-row"><b>캠프</b><span>' + esc(j.camp) + ' · ' + esc(j.route) + '</span></div>' +
+      '<div class="jc-row"><b>단가</b><span><strong>' + won(j.price) + '</strong>' + (j.jibun ? ' (지번)' : '') + '</span></div>' +
+      '<div class="jc-row"><b>매칭 기사</b><span>' + (j.matched ? '@' + esc(j.matched) : '<span class="muted">-</span>') + '</span></div></div></div>';
+  }
+
+  $('body').addEventListener('click', async function(e){
+    const ap = e.target.closest('[data-approve]');
+    if(ap){
+      e.stopPropagation();
+      try { await api('adminUpdateUser', { id: ap.dataset.approve, fields: { status: '승인' } }); toast('승인했습니다.', 'ok'); S.stats = null; load(); }
+      catch(err){ toast(err.message, 'err'); }
+      return;
+    }
+    const u = e.target.closest('[data-user]');
+    if(u){ editUser(u.dataset.user); return; }
+    const j = e.target.closest('[data-job]');
+    if(j){ editJob(j.dataset.job); }
+  });
+
+  /* ---------- 공통 폼 헬퍼 ---------- */
+  function fld(id, label, val, o){
+    o = o || {};
+    return '<div class="field' + (o.full ? ' full' : '') + '"><label for="' + id + '">' + label + '</label>' +
+      (o.area ? '<textarea id="' + id + '" maxlength="' + (o.max || 200) + '">' + esc(val) + '</textarea>'
+              : '<input type="' + (o.type || 'text') + '" id="' + id + '" value="' + esc(val) + '"' + (o.attr ? ' ' + o.attr : '') + '>') + '</div>';
+  }
+  function sel(id, label, val, opts, o){
+    return '<div class="field' + (o && o.full ? ' full' : '') + '"><label for="' + id + '">' + label + '</label><select id="' + id + '">' +
+      opts.map(function(x){ const v = Array.isArray(x) ? x[0] : x, l = Array.isArray(x) ? x[1] : x; return '<option value="' + esc(v) + '"' + (v === val ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join('') + '</select></div>';
+  }
+  function val(id){ return $(id).value.trim(); }
+
+  function askModal(title, label, type, okText, hintText){
+    return new Promise(function(resolve){
+      const m = openModal('<h3>' + esc(title) + '</h3><div class="field" style="margin-top:12px"><label for="askIn">' + esc(label) + '</label>' +
+        '<input type="' + type + '" id="askIn" autocomplete="off">' + (hintText ? '<div class="hint">' + esc(hintText) + '</div>' : '') + '</div>' +
+        '<div class="m-actions"><button class="btn btn-ghost" data-v="0">취소</button><button class="btn btn-primary" data-v="1">' + esc(okText) + '</button></div>', true);
+      m.querySelector('#askIn').focus();
+      m.addEventListener('click', function(e){
+        const b = e.target.closest('[data-v]'); if(!b) return;
+        const v = m.querySelector('#askIn').value.trim();
+        resolve(b.dataset.v === '1' ? v : null);
+      });
+    });
+  }
+
+  /* ---------- 회원 수정 ---------- */
+  function editUser(id){
+    const u = S.users.filter(function(x){ return x.id === id; })[0]; if(!u) return;
+    const me = getUser() || {};
+    const m = openModal('<h3>@' + esc(u.id) + ' 회원 정보</h3><div class="muted small" style="margin-bottom:12px">가입 ' + esc(fmtTime(u.created) || '-') + ' · 최근접속 ' + esc(u.lastLogin ? fmtTime(u.lastLogin) : '-') + '</div>' +
+      '<div class="form2">' +
+      fld('u_name', '이름', u.name) + fld('u_phone', '연락처', u.phone, { type: 'tel' }) +
+      fld('u_qfId', '퀵플렉스 아이디', u.qfId, { full: true }) +
+      fld('u_camp', '캠프', u.camp) + fld('u_route', '라우트', u.route) +
+      fld('u_campLoc', '캠프 위치', u.campLoc, { full: true }) +
+      fld('u_bank', '은행명', u.bank) + fld('u_holder', '예금주', u.holder) +
+      fld('u_acct', '계좌번호', u.acct, { full: true }) +
+      sel('u_status', '상태', u.status, ['승인', '승인대기', '차단']) +
+      sel('u_role', '권한', u.role === '관리자' ? '관리자' : '일반', ['일반', '관리자']) + '</div>' +
+      '<div class="m-actions wrap">' +
+      '<button class="btn btn-primary" data-a="save">저장</button>' +
+      '<button class="btn btn-ghost" data-a="pw">비밀번호 재설정</button>' +
+      '<button class="btn btn-ghost" data-a="rename"' + (u.id === me.id ? ' disabled' : '') + '>아이디 변경</button>' +
+      '<button class="btn btn-danger" data-a="del"' + (u.id === me.id ? ' disabled' : '') + '>회원 삭제</button>' +
+      '<button class="btn btn-ghost" data-a="close" style="flex-basis:100%">닫기</button></div>', true);
+
+    m.addEventListener('click', async function(e){
+      const b = e.target.closest('[data-a]'); if(!b || b.disabled) return;
+      const a = b.dataset.a;
+      try {
+        if(a === 'close'){ closeModal(); }
+        else if(a === 'save'){
+          const fields = { name: val('u_name'), phone: val('u_phone'), qfId: val('u_qfId'), camp: val('u_camp'), route: val('u_route'),
+            campLoc: val('u_campLoc'), bank: val('u_bank'), holder: val('u_holder'), acct: val('u_acct'), status: val('u_status'), role: val('u_role') };
+          await api('adminUpdateUser', { id: u.id, fields: fields });
+          closeModal(); toast('저장했습니다.', 'ok'); S.stats = null; load();
+        }
+        else if(a === 'pw'){
+          const pw = await askModal('@' + u.id + ' 비밀번호 재설정', '새 비밀번호 (6자 이상)', 'text', '재설정', '재설정하면 해당 회원은 즉시 로그아웃되고 새 비밀번호로 로그인해야 합니다.');
+          if(pw === null){ editUser(id); return; }
+          await api('adminSetPassword', { id: u.id, password: pw });
+          toast('비밀번호를 재설정했습니다.', 'ok'); editUser(id);
+        }
+        else if(a === 'rename'){
+          const nid = await askModal('@' + u.id + ' 아이디 변경', '새 아이디', 'text', '변경', '영문/숫자/밑줄(_) 4~20자. 용차일·의뢰·알림 기록의 아이디도 함께 바뀌고, 해당 회원은 다시 로그인해야 합니다.');
+          if(nid === null){ editUser(id); return; }
+          await api('adminRenameUser', { id: u.id, newId: nid });
+          closeModal(); toast('아이디를 변경했습니다.', 'ok'); S.stats = null; load();
+        }
+        else if(a === 'del'){
+          const ok = await confirmModal('@' + u.id + ' 회원을 삭제할까요?', '삭제하면 복구할 수 없습니다.\n모집중인 용차일은 취소되고, 응답 대기중인 의뢰는 거절 처리됩니다. 매칭 완료 기록은 이력으로 남습니다.', '삭제');
+          if(!ok){ editUser(id); return; }
+          await api('adminDeleteUser', { id: u.id });
+          toast('삭제했습니다.', 'ok'); S.stats = null; load();
+        }
+      } catch(err){ toast(err.message, 'err'); if(a === 'pw' || a === 'rename' || a === 'del') editUser(id); }
+    });
+  }
+
+  /* ---------- 용차일 수정 ---------- */
+  function editJob(sid){
+    const j = S.jobs.filter(function(x){ return x.sid === sid; })[0]; if(!j) return;
+    const m = openModal('<h3>' + esc(kdate(j.date)) + ' 용차일</h3><div class="muted small" style="margin-bottom:12px">등록자 @' + esc(j.owner) + ' · 등록 ' + esc(fmtTime(j.created) || '-') + '</div>' +
+      '<div class="form2">' +
+      fld('j_date', '날짜 (PDD 기준)', j.date, { type: 'date' }) + sel('j_shift', '근무', j.shift, ['주간', '야간']) +
+      fld('j_camp', '캠프', j.camp) + fld('j_route', '라우트', j.route) +
+      fld('j_price', '단가 (원)', j.price, { type: 'number', attr: 'inputmode="numeric" min="1"' }) +
+      sel('j_jibun', '지번', j.jibun ? '1' : '0', [['0', '아니오'], ['1', '지번 (+200원 포함)']]) +
+      fld('j_parking', '주차자리', j.parking, { full: true }) +
+      fld('j_tip', '배송팁', j.tip, { full: true, area: true, max: 200 }) +
+      fld('j_note', '특이사항', j.note, { full: true, area: true, max: 500 }) +
+      sel('j_status', '상태', j.status, ['모집중', '매칭완료', '취소']) +
+      fld('j_matched', '매칭 기사 아이디', j.matched, { attr: 'placeholder="매칭완료일 때만"' }) + '</div>' +
+      '<div class="m-actions wrap"><button class="btn btn-primary" data-a="save">저장</button>' +
+      '<button class="btn btn-danger" data-a="del">삭제</button>' +
+      '<button class="btn btn-ghost" data-a="close" style="flex-basis:100%">닫기</button></div>', true);
+
+    m.addEventListener('click', async function(e){
+      const b = e.target.closest('[data-a]'); if(!b) return;
+      const a = b.dataset.a;
+      try {
+        if(a === 'close'){ closeModal(); }
+        else if(a === 'save'){
+          await api('adminUpdateJob', { sid: j.sid, fields: {
+            date: val('j_date'), shift: val('j_shift'), camp: val('j_camp'), route: val('j_route'), price: val('j_price'),
+            jibun: val('j_jibun') === '1', parking: val('j_parking'), tip: val('j_tip'), note: val('j_note'),
+            status: val('j_status'), matched: val('j_matched') } });
+          closeModal(); toast('저장했습니다.', 'ok'); S.stats = null; load();
+        }
+        else if(a === 'del'){
+          const ok = await confirmModal('이 용차일을 삭제할까요?', '삭제하면 복구할 수 없고, 연결된 의뢰 기록도 함께 삭제됩니다.', '삭제');
+          if(!ok){ editJob(sid); return; }
+          await api('adminDeleteJob', { sid: j.sid });
+          toast('삭제했습니다.', 'ok'); S.stats = null; load();
+        }
+      } catch(err){ toast(err.message, 'err'); if(a === 'del') editJob(sid); }
+    });
+  }
+</script>
+</body>
+</html>
