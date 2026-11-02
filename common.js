@@ -1,7 +1,7 @@
 /* ===== 용차 매칭 - 공통 스크립트 ===== */
 
 // ⚠️ Apps Script 웹앱 배포 후 나오는 URL 로 교체하세요. (이 파일 한 곳만 수정하면 전체 페이지에 적용)
-const API_URL = "https://script.google.com/macros/s/AKfycbwuEePnti5rm4ISiD4FVxdXE7zbzkExlDcxsuZyugV4nC5K88iulsbUIMHrhpOy60bnSw/exec";
+const API_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 
 const TOKEN_KEY = 'yc_token';
 const USER_KEY = 'yc_user';
@@ -137,6 +137,7 @@ function openMenu(){
     '<div class="muted small" style="margin-top:6px">' + esc(u.camp || '') + ' · ' + esc(u.route || '') + '</div>' +
     '<div class="m-actions" style="flex-direction:column">' +
     '<a class="btn btn-ghost" href="home.html">홈</a>' +
+    '<a class="btn btn-ghost" href="schedule.html">내 스케줄</a>' +
     '<button class="btn btn-danger" id="logoutBtn">로그아웃</button></div>');
   m.querySelector('#logoutBtn').onclick = async function(){
     try { await api('logout'); } catch(e){}
@@ -232,7 +233,7 @@ async function showMatchScreen(rid){
       '<div class="jc-row"><b>주차자리</b><span>' + esc(j.parking || '-') + '</span></div>' +
       '<div class="jc-row"><b>배송팁</b><span>' + esc(j.tip || '-') + '</span></div>' +
       '<div class="jc-row"><b>특이사항</b><span>' + esc(j.note || '-') + '</span></div></div>' +
-      '<div class="m-actions"><button class="btn btn-primary" onclick="closeModal()">확인</button></div>');
+      '<div class="m-actions">' + (done ? '<a class="btn btn-ghost" href="schedule.html">스케줄 보기</a>' : '') + '<button class="btn btn-primary" onclick="closeModal()">확인</button></div>');
   } catch(e){
     toast(e.message, 'err');
   }
