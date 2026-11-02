@@ -1,7 +1,7 @@
 /* ===== 용차 매칭 - 공통 스크립트 ===== */
 
 // ⚠️ Apps Script 웹앱 배포 후 나오는 URL 로 교체하세요. (이 파일 한 곳만 수정하면 전체 페이지에 적용)
-const API_URL = "https://script.google.com/macros/s/AKfycbwuEePnti5rm4ISiD4FVxdXE7zbzkExlDcxsuZyugV4nC5K88iulsbUIMHrhpOy60bnSw/exec";
+const API_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 
 const TOKEN_KEY = 'yc_token';
 const USER_KEY = 'yc_user';
@@ -57,6 +57,10 @@ function shortDate(s){ const d = parseYmd(s); return (d.getMonth()+1) + '/' + d.
 function fmtTime(s){ // 'yyyy-MM-dd HH:mm:ss' -> 'M/d HH:mm'
   const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(s || '');
   return m ? (Number(m[2]) + '/' + Number(m[3]) + ' ' + m[4] + ':' + m[5]) : '';
+}
+function shiftTag(s){
+  const night = (s || '주간') === '야간';
+  return '<span class="tag" style="background:' + (night ? '#1E2E4D;color:#fff' : '#FBF1DC;color:#C6852A') + '">' + (night ? '야간' : '주간') + '</span>';
 }
 function telLink(p){ return p ? '<a class="tel" href="tel:' + esc(String(p).replace(/[^0-9]/g,'')) + '">' + esc(p) + '</a>' : '-'; }
 
@@ -214,7 +218,7 @@ async function showMatchScreen(rid){
     const q = r.request, j = r.job, c = r.counterpart;
     const done = q.status === '수락';
     const hero = done
-      ? '<div class="match-hero"><div class="ok-ico">' + ICON.check + '</div><h3>매칭이 완료되었습니다</h3><div class="muted small">' + esc(kdate(j.date)) + ' 용차</div></div>'
+      ? '<div class="match-hero"><div class="ok-ico">' + ICON.check + '</div><h3>매칭이 완료되었습니다</h3><div class="muted small">' + esc(kdate(j.date)) + ' ' + esc(j.shift || '주간') + ' 용차 (PDD 기준)</div></div>'
       : '<div class="match-hero pending"><div class="ok-ico">' + ICON.bell + '</div><h3>의뢰 정보</h3><div class="muted small">상태: ' + esc(q.status) + '</div></div>';
     const who = q.role === 'owner' ? '용차 기사' : '용차 요청자';
     const contact = done
@@ -226,7 +230,8 @@ async function showMatchScreen(rid){
       '<div class="card detail-rows" style="margin:0 0 4px">' +
       '<div class="jc-row"><b>' + who + '</b><span><strong>@' + esc(c.id) + '</strong></span></div>' + contact +
       '</div><div class="card detail-rows" style="margin:10px 0 0">' +
-      '<div class="jc-row"><b>날짜</b><span>' + esc(kdate(j.date)) + '</span></div>' +
+      '<div class="jc-row"><b>날짜</b><span>' + esc(kdate(j.date)) + ' <span class="muted small">PDD 기준</span></span></div>' +
+      '<div class="jc-row"><b>근무</b><span>' + shiftTag(j.shift) + '</span></div>' +
       '<div class="jc-row"><b>캠프</b><span>' + esc(j.camp) + '</span></div>' +
       '<div class="jc-row"><b>라우트</b><span>' + esc(j.route) + '</span></div>' +
       '<div class="jc-row"><b>단가</b><span><strong>' + won(j.price) + '</strong>' + (j.jibun ? ' (지번 포함)' : '') + '</span></div>' +
