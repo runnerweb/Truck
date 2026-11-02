@@ -24,7 +24,7 @@
       <div id="cal"></div>
       <div class="legend">
         <span><i style="background:var(--amber-soft)"></i>의뢰 가능</span>
-        <span><i style="background:var(--success-soft)"></i>내가 의뢰함</span>
+        <span><i style="background:var(--success-soft)"></i>매칭중</span>
         <span><i style="background:#ECEAE2"></i>마감</span>
         <span><i style="background:var(--danger-soft)"></i>거절됨</span>
       </div>
@@ -41,7 +41,7 @@
   if(requireLogin()){
     renderAppbar({ title: '용차일 보기', back: true, onBack: function(){ if(inDetail) showList(); else location.href = 'home.html'; } });
     $('q').addEventListener('input', renderList);
-    window.addEventListener('yc:noti-changed', function(){ if(inDetail && post) openPost(post.postId, pickedSid, true); });
+    window.addEventListener('yc:noti-changed', function(){ if(inDetail && post) openPost(post.postId, pickedSid, true); else if(!inDetail) loadList(); });
     loadList();
   }
 
@@ -63,10 +63,16 @@
       return;
     }
     $('list').innerHTML = rows.map(function(g){
-      const shown = g.dates.slice(0, 4).map(function(d){ return '<span class="chip">' + esc(shortDate(d.date)) + '</span>'; }).join('');
+      const shown = g.dates.slice(0, 4).map(function(d){
+        return d.matching
+          ? '<span class="chip" style="background:#E4F0EB;color:#2F6F5E">' + esc(shortDate(d.date)) + ' 매칭중</span>'
+          : '<span class="chip">' + esc(shortDate(d.date)) + '</span>';
+      }).join('');
       const more = g.dates.length > 4 ? '<span class="chip more">+' + (g.dates.length - 4) + '일</span>' : '';
-      return '<button type="button" class="job-card" data-pid="' + esc(g.postId) + '">' +
-        '<div class="jc-top"><div class="jc-id"><span class="avatar">' + esc(g.owner.charAt(0).toUpperCase()) + '</span>@' + esc(g.owner) + (g.mine ? ' <span class="tag request">내 등록</span>' : '') + '</div>' +
+      const matching = g.myPending > 0;
+      return '<button type="button" class="job-card" data-pid="' + esc(g.postId) + '"' + (matching ? ' style="border-color:#E8A33D;box-shadow:inset 4px 0 0 #E8A33D"' : '') + '>' +
+        '<div class="jc-top"><div class="jc-id"><span class="avatar">' + esc(g.owner.charAt(0).toUpperCase()) + '</span>@' + esc(g.owner) + (g.mine ? ' <span class="tag request">내 등록</span>' : '') +
+        (matching ? ' <span class="tag" style="background:#E8A33D;color:#0F1826">매칭중' + (g.dates.length > 1 ? ' ' + g.myPending + '일' : '') + '</span>' : '') + '</div>' +
         '<div class="jc-price">' + won(g.price) + '</div></div>' +
         '<div class="jc-row"><b>캠프</b><span>' + esc(g.camp) + '</span></div>' +
         '<div class="jc-row"><b>라우트</b><span>' + esc(g.route) + (g.jibun ? ' · 지번' : '') + '</span></div>' +
@@ -94,7 +100,8 @@
       $('listView').hidden = true; $('detailView').hidden = false;
 
       $('postHead').innerHTML =
-        '<div class="jc-top"><div class="jc-id"><span class="avatar">' + esc(post.owner.charAt(0).toUpperCase()) + '</span>@' + esc(post.owner) + '</div>' +
+        '<div class="jc-top"><div class="jc-id"><span class="avatar">' + esc(post.owner.charAt(0).toUpperCase()) + '</span>@' + esc(post.owner) +
+        (post.dates.some(function(d){ return d.myRequest === '대기'; }) ? ' <span class="tag" style="background:#E8A33D;color:#0F1826">매칭중</span>' : '') + '</div>' +
         '<div class="jc-price">' + (post.dates[0] ? won(post.dates[0].price) : '') + '</div></div>' +
         '<div class="detail-rows">' +
         '<div class="jc-row"><b>아이디</b><span>@' + esc(post.owner) + '</span></div>' +
@@ -138,7 +145,7 @@
     } else if(d.myRequest === '수락'){
       action = '<button class="btn btn-ok btn-block" id="viewMatch">매칭 완료 · 정보 보기</button>';
     } else if(d.myRequest === '대기'){
-      action = '<button class="btn btn-primary btn-block" disabled>의뢰 완료 · 응답 대기중</button>';
+      action = '<button class="btn btn-primary btn-block" disabled>매칭중 · 응답 대기중</button>';
     } else if(d.myRequest === '거절'){
       action = '<button class="btn btn-primary btn-block" disabled>거절된 의뢰입니다</button>';
     } else if(d.status !== '모집중'){
@@ -174,7 +181,7 @@
     if(!ok) return;
     try {
       await api('requestJob', { sid: d.sid });
-      toast('의뢰했습니다. 수락 여부를 알림으로 알려드립니다.', 'ok');
+      toast('의뢰했습니다. 매칭중입니다. 수락 여부를 알림으로 알려드립니다.', 'ok');
       openPost(post.postId, d.sid, true);
     } catch(e){ toast(e.message, 'err'); }
   }
