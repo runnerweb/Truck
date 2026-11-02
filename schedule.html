@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1826">
+<title>내 스케줄</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="container">
+  <div class="seg" id="seg">
+    <button type="button" class="on" data-f="all">전체</button>
+    <button type="button" data-f="driver">내가 맡은 용차</button>
+    <button type="button" data-f="owner">기사 배정됨</button>
+  </div>
+
+  <div class="card">
+    <div id="cal"></div>
+    <div class="legend">
+      <span><i style="background:var(--success-soft)"></i>내가 맡은 용차</span>
+      <span><i style="background:var(--amber-soft)"></i>기사 배정됨</span>
+      <span><i style="background:#F1EFE8"></i>지난 일정</span>
+    </div>
+  </div>
+
+  <div class="h2" id="listTitle">다가오는 일정</div>
+  <div id="list"><div class="empty">불러오는 중...</div></div>
+</main>
+
+<script src="common.js"></script>
+<script>
+  const $ = function(id){ return document.getElementById(id); };
+  let all = [], today = todayStr(), filter = 'all', picked = null, cal = null;
+
+  if(requireLogin()){
+    renderAppbar({ title: '내 스케줄', back: true });
+    window.addEventListener('yc:noti-changed', load);
+    $('seg').addEventListener('click', function(e){
+      const b = e.target.closest('button[data-f]'); if(!b) return;
+      filter = b.dataset.f; picked = null;
+      Array.prototype.forEach.call($('seg').children, function(x){ x.classList.toggle('on', x === b); });
+      draw(true);
+    });
+    load();
+  }
+
+  async function load(){
+    try {
+      const r = await api('schedule');
+      all = r.items || [];
+      if(r.today) today = r.today;
+      draw(!cal);
+    } catch(e){ $('list').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+  }
+
+  function visible(){ return all.filter(function(i){ return filter === 'all' || i.role === filter; }); }
+
+  function dateMap(items){
+    const m = {};
+    items.forEach(function(i){
+      const past = i.date < today;
+      let cls = past ? 'past' : (i.role === 'driver' ? 'requested' : 'open');
+      if(m[i.date] && !past && m[i.date].cls !== 'past' && m[i.date].cls !== cls) cls = 'requested'; // 같은 날 두 역할이면 '맡은 용차' 색
+      m[i.date] = { cls: cls };
+    });
+    return m;
+  }
+
+  function draw(rebuildCal){
+    const items = visible();
+    const map = dateMap(items);
+    if(rebuildCal || !cal){
+      const old = $('cal'); const fresh = old.cloneNode(false); old.replaceWith(fresh);
+      const upcoming = items.filter(function(i){ return i.date >= today; })[0];
+      cal = Calendar($('cal'), { mode: 'pick', start: upcoming ? upcoming.date : today, dates: map,
+        onPick: function(ds){ picked = (picked === ds) ? null : ds; renderList(); } });
+    } else {
+      cal.setDates(map);
+    }
+    renderList();
+  }
+
+  function renderList(){
+    const items = visible();
+    let rows, title;
+    if(picked){
+      rows = items.filter(function(i){ return i.date === picked; });
+      title = kdate(picked) + ' 일정';
+    } else {
+      rows = items.filter(function(i){ return i.date >= today; });
+      title = '다가오는 일정';
+    }
+    $('listTitle').textContent = title;
+    if(!rows.length){
+      $('list').innerHTML = '<div class="empty">' + (picked ? '이 날짜에는 매칭된 일정이 없습니다.' : '매칭된 일정이 없습니다.<br>용차 의뢰가 수락되면 여기에 표시됩니다.') + '</div>';
+      return;
+    }
+    $('list').innerHTML = rows.map(function(i){
+      const driver = i.role === 'driver';
+      const c = i.counterpart || {};
+      return '<div class="job-card sch-card" data-rid="' + esc(i.rid) + '">' +
+        '<div class="jc-top"><div class="sch-date">' + esc(kdate(i.date)) + '</div>' +
+        '<span class="tag ' + (i.date < today ? 'done' : i.role) + '">' + (i.date < today ? '지난 일정' : (driver ? '내가 맡은 용차' : '기사 배정됨')) + '</span></div>' +
+        '<div class="jc-row"><b>캠프</b><span>' + esc(i.camp) + '</span></div>' +
+        '<div class="jc-row"><b>라우트</b><span>' + esc(i.route) + '</span></div>' +
+        '<div class="jc-row"><b>단가</b><span><strong>' + won(i.price) + '</strong>' + (i.jibun ? ' (지번 포함)' : '') + '</span></div>' +
+        '<div class="jc-row"><b>' + (driver ? '요청자' : '용차 기사') + '</b><span>@' + esc(c.id) + (c.name ? ' · ' + esc(c.name) : '') + '</span></div>' +
+        '<div class="jc-row"><b>연락처</b><span>' + telLink(c.phone) + '</span></div>' +
+        '<div class="jc-row"><b>주차자리</b><span>' + esc(i.parking || '-') + '</span></div>' +
+        '</div>';
+    }).join('');
+  }
+
+  $('list').addEventListener('click', function(e){
+    if(e.target.closest('a')) return; // 전화 링크는 그대로 동작
+    const c = e.target.closest('.sch-card'); if(!c || !c.dataset.rid) return;
+    showMatchScreen(c.dataset.rid);
+  });
+</script>
+</body>
+</html>
