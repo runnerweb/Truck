@@ -42,6 +42,11 @@
     <div><div class="bb-t">내 스케줄</div><div class="bb-s">매칭 완료된 용차 일정과 기사 정보를 확인하세요</div></div>
   </a>
 
+  <a class="big-btn" id="adminBtn" href="admin.html" hidden style="background:#fff;color:#0F1826;border:1.5px solid #E4E1D8">
+    <div class="bb-ico" style="background:#ECEAE2"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+    <div><div class="bb-t">관리자</div><div class="bb-s">회원 · 용차일 · 로그인 정보를 관리합니다</div></div>
+  </a>
+
   <div class="card" style="margin-top:20px">
     <div class="small muted" style="margin-bottom:8px;font-weight:700">내 정보</div>
     <div class="detail-rows">
@@ -66,6 +71,7 @@
     document.getElementById('pCamp').textContent = u.camp || '-';
     document.getElementById('pRoute').textContent = u.route || '-';
     document.getElementById('pLoc').textContent = u.campLoc || '-';
+    document.getElementById('adminBtn').hidden = !u.isAdmin;
   }
 </script>
 </body>
