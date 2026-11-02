@@ -1,7 +1,7 @@
 /* ===== 용차 매칭 - 공통 스크립트 ===== */
 
 // ⚠️ Apps Script 웹앱 배포 후 나오는 URL 로 교체하세요. (이 파일 한 곳만 수정하면 전체 페이지에 적용)
-const API_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+const API_URL = "https://script.google.com/macros/s/AKfycbwuEePnti5rm4ISiD4FVxdXE7zbzkExlDcxsuZyugV4nC5K88iulsbUIMHrhpOy60bnSw/exec";
 
 const TOKEN_KEY = 'yc_token';
 const USER_KEY = 'yc_user';
