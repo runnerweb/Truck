@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1826">
+<title>용차 매칭 | 회원가입</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="auth">
+  <div class="brand">
+    <div>
+      <div class="brand-eyebrow">용차 매칭</div>
+      <h1 class="brand-title">가입 한 번으로<br>용차일 등록과<br>의뢰를 모두</h1>
+      <p class="brand-sub">이름, 퀵플렉스 아이디, 캠프·라우트 정보와<br>계좌 정보를 입력하면 바로 시작할 수 있습니다.</p>
+    </div>
+    <div class="brand-footer">© 러너로지스 · 용차 매칭</div>
+  </div>
+
+  <div class="form-panel">
+    <div class="form-card">
+      <h1>회원가입</h1>
+      <p class="desc">모든 항목을 입력해 주세요.</p>
+
+      <form id="registerForm" autocomplete="off">
+        <div class="sec-title">로그인 정보</div>
+        <div class="field">
+          <label for="id">아이디</label>
+          <div class="id-row">
+            <input type="text" id="id" autocapitalize="none" maxlength="20" placeholder="영문/숫자/_ 4~20자" required>
+            <button type="button" class="btn-check" id="checkIdBtn">중복확인</button>
+          </div>
+          <div class="hint" id="idHint"></div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="password">비밀번호</label>
+            <input type="password" id="password" autocomplete="new-password" placeholder="6자 이상" required>
+          </div>
+          <div class="field">
+            <label for="password2">비밀번호 확인</label>
+            <input type="password" id="password2" autocomplete="new-password" required>
+          </div>
+        </div>
+
+        <div class="sec-title">기본 정보</div>
+        <div class="row2">
+          <div class="field">
+            <label for="name">이름</label>
+            <input type="text" id="name" maxlength="30" required>
+          </div>
+          <div class="field">
+            <label for="phone">연락처</label>
+            <input type="tel" id="phone" placeholder="010-0000-0000" maxlength="13" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="qfId">퀵플렉스 아이디</label>
+          <input type="text" id="qfId" maxlength="40" required>
+        </div>
+
+        <div class="sec-title">캠프 · 라우트 정보</div>
+        <div class="row2">
+          <div class="field">
+            <label for="camp">캠프 정보</label>
+            <input type="text" id="camp" placeholder="예: 강서1" maxlength="50" required>
+          </div>
+          <div class="field">
+            <label for="route">라우트 정보</label>
+            <input type="text" id="route" placeholder="예: A-12" maxlength="50" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="campLoc">캠프 위치</label>
+          <input type="text" id="campLoc" placeholder="캠프 주소 또는 지역" maxlength="100" required>
+        </div>
+
+        <div class="sec-title">계좌 정보</div>
+        <div class="row2">
+          <div class="field">
+            <label for="bank">은행명</label>
+            <input type="text" id="bank" placeholder="예: 국민은행" maxlength="30" required>
+          </div>
+          <div class="field">
+            <label for="holder">예금주</label>
+            <input type="text" id="holder" maxlength="30" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="acct">계좌번호</label>
+          <input type="text" id="acct" inputmode="numeric" placeholder="숫자만 입력" maxlength="25" required>
+        </div>
+
+        <div class="field" style="margin-top:18px">
+          <label class="check"><input type="checkbox" id="agree"> 개인정보 수집·이용에 동의합니다 (필수)</label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn">가입하기</button>
+      </form>
+
+      <div class="msg" id="msgBox"></div>
+      <div class="bottom-link">이미 계정이 있으신가요? <a href="login.html">로그인</a></div>
+    </div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+  const $ = function(id){ return document.getElementById(id); };
+  const idInput = $('id'), idHint = $('idHint'), msgBox = $('msgBox'), submitBtn = $('submitBtn');
+  let checkedId = '';
+
+  function showMsg(t, type){ msgBox.textContent = t; msgBox.className = 'msg ' + type; }
+  function hint(t, cls){ idHint.textContent = t; idHint.className = 'hint ' + (cls || ''); }
+
+  idInput.addEventListener('input', function(){ checkedId = ''; hint(''); });
+
+  $('checkIdBtn').addEventListener('click', async function(){
+    const id = idInput.value.trim();
+    if(!/^[A-Za-z0-9_]{4,20}$/.test(id)){ hint('아이디는 영문/숫자/밑줄(_) 4~20자로 입력하세요.', 'bad'); return; }
+    hint('확인 중...');
+    try {
+      const r = await api('checkId', { id: id });
+      if(r.duplicate){ checkedId = ''; hint('이미 사용 중인 아이디입니다.', 'bad'); }
+      else { checkedId = id; hint('사용 가능한 아이디입니다.', 'ok'); }
+    } catch(e){ hint(e.message, 'bad'); }
+  });
+
+  // 연락처 자동 하이픈
+  $('phone').addEventListener('input', function(){
+    const d = this.value.replace(/\D/g, '').slice(0, 11);
+    this.value = d.length < 4 ? d : d.length < 8 ? d.slice(0,3) + '-' + d.slice(3) : d.slice(0,3) + '-' + d.slice(3, d.length - 4) + '-' + d.slice(-4);
+  });
+
+  $('registerForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const v = {};
+    ['id','name','phone','qfId','camp','campLoc','route','bank','acct','holder'].forEach(function(k){ v[k] = $(k).value.trim(); });
+    const pw = $('password').value, pw2 = $('password2').value;
+
+    if(Object.keys(v).some(function(k){ return !v[k]; }) || !pw){ showMsg('모든 항목을 입력하세요.', 'error'); return; }
+    if(pw.length < 6){ showMsg('비밀번호는 6자 이상이어야 합니다.', 'error'); return; }
+    if(pw !== pw2){ showMsg('비밀번호 확인이 일치하지 않습니다.', 'error'); return; }
+    if(checkedId !== v.id){ showMsg('아이디 중복확인을 먼저 진행하세요.', 'error'); return; }
+    if(!/^[0-9\-]{9,13}$/.test(v.phone)){ showMsg('연락처를 올바르게 입력하세요.', 'error'); return; }
+    if(!/^[0-9\-]{6,25}$/.test(v.acct)){ showMsg('계좌번호는 숫자와 하이픈(-)만 입력하세요.', 'error'); return; }
+    if(!$('agree').checked){ showMsg('개인정보 수집·이용에 동의해 주세요.', 'error'); return; }
+
+    submitBtn.disabled = true; submitBtn.textContent = '가입 중...';
+    try {
+      const r = await api('register', Object.assign({ password: pw }, v));
+      showMsg(r.message || '가입이 완료되었습니다.', 'success');
+      setTimeout(function(){ location.href = 'login.html'; }, 1500);
+    } catch(err){
+      showMsg(err.message, 'error');
+      submitBtn.disabled = false; submitBtn.textContent = '가입하기';
+    }
+  });
+</script>
+</body>
+</html>

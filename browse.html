@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1826">
+<title>용차일 보기</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="container">
+
+  <!-- 1) 목록: 아이디 / 날짜 / 캠프 / 라우트 / 단가 카드 -->
+  <section id="listView">
+    <div class="field"><input type="text" id="q" placeholder="아이디 · 캠프 · 라우트 검색"></div>
+    <div id="list"><div class="empty">불러오는 중...</div></div>
+  </section>
+
+  <!-- 2) 상세: 달력 → 날짜 클릭 → 자세한 정보 -->
+  <section id="detailView" hidden>
+    <div class="card" id="postHead"></div>
+    <div class="h2">날짜를 선택하세요</div>
+    <div class="card">
+      <div id="cal"></div>
+      <div class="legend">
+        <span><i style="background:var(--amber-soft)"></i>의뢰 가능</span>
+        <span><i style="background:var(--success-soft)"></i>내가 의뢰함</span>
+        <span><i style="background:#ECEAE2"></i>마감</span>
+        <span><i style="background:var(--danger-soft)"></i>거절됨</span>
+      </div>
+    </div>
+    <div id="dateDetail"></div>
+  </section>
+</main>
+
+<script src="common.js"></script>
+<script>
+  const $ = function(id){ return document.getElementById(id); };
+  let jobs = [], post = null, cal = null, pickedSid = null, inDetail = false;
+
+  if(requireLogin()){
+    renderAppbar({ title: '용차일 보기', back: true, onBack: function(){ if(inDetail) showList(); else location.href = 'home.html'; } });
+    $('q').addEventListener('input', renderList);
+    window.addEventListener('yc:noti-changed', function(){ if(inDetail && post) openPost(post.postId, pickedSid, true); });
+    loadList();
+  }
+
+  async function loadList(){
+    try {
+      const r = await api('listJobs');
+      jobs = r.jobs || [];
+      renderList();
+    } catch(e){ $('list').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+  }
+
+  function renderList(){
+    const q = $('q').value.trim().toLowerCase();
+    const rows = jobs.filter(function(g){
+      return !q || (g.owner + ' ' + g.camp + ' ' + g.route).toLowerCase().indexOf(q) >= 0;
+    });
+    if(!rows.length){
+      $('list').innerHTML = '<div class="empty">' + (jobs.length ? '검색 결과가 없습니다.' : '현재 등록된 용차일이 없습니다.') + '</div>';
+      return;
+    }
+    $('list').innerHTML = rows.map(function(g){
+      const shown = g.dates.slice(0, 4).map(function(d){ return '<span class="chip">' + esc(shortDate(d.date)) + '</span>'; }).join('');
+      const more = g.dates.length > 4 ? '<span class="chip more">+' + (g.dates.length - 4) + '일</span>' : '';
+      return '<button type="button" class="job-card" data-pid="' + esc(g.postId) + '">' +
+        '<div class="jc-top"><div class="jc-id"><span class="avatar">' + esc(g.owner.charAt(0).toUpperCase()) + '</span>@' + esc(g.owner) + '</div>' +
+        '<div class="jc-price">' + won(g.price) + '</div></div>' +
+        '<div class="jc-row"><b>캠프</b><span>' + esc(g.camp) + '</span></div>' +
+        '<div class="jc-row"><b>라우트</b><span>' + esc(g.route) + (g.jibun ? ' · 지번' : '') + '</span></div>' +
+        '<div class="chips">' + shown + more + '</div></button>';
+    }).join('');
+  }
+
+  $('list').addEventListener('click', function(e){
+    const c = e.target.closest('.job-card'); if(!c) return;
+    openPost(c.dataset.pid);
+  });
+
+  function showList(){
+    inDetail = false; pickedSid = null;
+    $('detailView').hidden = true; $('listView').hidden = false;
+    window.scrollTo(0, 0);
+    loadList();
+  }
+
+  async function openPost(pid, keepSid, quiet){
+    try {
+      const r = await api('getJob', { postId: pid });
+      post = r.post; inDetail = true;
+      $('listView').hidden = true; $('detailView').hidden = false;
+
+      $('postHead').innerHTML =
+        '<div class="jc-top"><div class="jc-id"><span class="avatar">' + esc(post.owner.charAt(0).toUpperCase()) + '</span>@' + esc(post.owner) + '</div>' +
+        '<div class="jc-price">' + (post.dates[0] ? won(post.dates[0].price) : '') + '</div></div>' +
+        '<div class="detail-rows">' +
+        '<div class="jc-row"><b>아이디</b><span>@' + esc(post.owner) + '</span></div>' +
+        '<div class="jc-row"><b>연락처</b><span>' + telLink(post.ownerPhone) + '</span></div>' +
+        '<div class="jc-row"><b>캠프</b><span>' + esc(post.camp) + '</span></div>' +
+        '<div class="jc-row"><b>라우트</b><span>' + esc(post.route) + '</span></div></div>';
+
+      const map = {};
+      post.dates.forEach(function(d){
+        let cls = 'open';
+        if(d.myRequest === '대기' || d.myRequest === '수락') cls = 'requested';
+        else if(d.myRequest === '거절') cls = 'rejected';
+        else if(d.status !== '모집중') cls = 'matched';
+        map[d.date] = { cls: cls, sid: d.sid };
+      });
+
+      const first = post.dates[0] ? post.dates[0].date : todayStr();
+      $('cal').innerHTML = '';
+      const fresh = $('cal').cloneNode(false); $('cal').replaceWith(fresh); // 이전 이벤트 리스너 제거
+      cal = Calendar($('cal'), { mode: 'pick', start: first, dates: map, onPick: function(ds){ showDate(ds); } });
+
+      $('dateDetail').innerHTML = '';
+      pickedSid = null;
+      if(keepSid){
+        const d = post.dates.filter(function(x){ return x.sid === keepSid; })[0];
+        if(d){ cal.select(d.date); showDate(d.date, quiet); }
+      }
+      if(!quiet) window.scrollTo(0, 0);
+    } catch(e){ toast(e.message, 'err'); }
+  }
+
+  function showDate(ds, quiet){
+    const d = post.dates.filter(function(x){ return x.date === ds; })[0];
+    if(!d) return;
+    pickedSid = d.sid;
+
+    let action = '';
+    if(post.isMine){
+      action = '<button class="btn btn-ghost btn-block" disabled>내가 등록한 용차일입니다</button>';
+    } else if(d.myRequest === '수락'){
+      action = '<button class="btn btn-ok btn-block" id="viewMatch">매칭 완료 · 정보 보기</button>';
+    } else if(d.myRequest === '대기'){
+      action = '<button class="btn btn-primary btn-block" disabled>의뢰 완료 · 응답 대기중</button>';
+    } else if(d.myRequest === '거절'){
+      action = '<button class="btn btn-primary btn-block" disabled>거절된 의뢰입니다</button>';
+    } else if(d.status !== '모집중'){
+      action = '<button class="btn btn-primary btn-block" disabled>마감된 일정입니다</button>';
+    } else {
+      action = '<button class="btn btn-accent btn-block" id="reqBtn">용차 의뢰하기</button>';
+    }
+
+    $('dateDetail').innerHTML =
+      '<div class="h2">' + esc(kdate(ds)) + ' 상세 정보</div>' +
+      '<div class="card detail-rows">' +
+      '<div class="jc-row"><b>아이디</b><span>@' + esc(post.owner) + '</span></div>' +
+      '<div class="jc-row"><b>연락처</b><span>' + telLink(post.ownerPhone) + '</span></div>' +
+      '<div class="jc-row"><b>캠프</b><span>' + esc(post.camp) + '</span></div>' +
+      '<div class="jc-row"><b>라우트</b><span>' + esc(post.route) + '</span></div>' +
+      '<div class="jc-row"><b>단가</b><span><strong>' + won(d.price) + '</strong>' + (d.jibun ? ' (지번 +200원 포함)' : '') + '</span></div>' +
+      '<div class="jc-row"><b>주차자리</b><span>' + esc(d.parking || '-') + '</span></div>' +
+      '<div class="jc-row"><b>배송팁</b><span>' + esc(d.tip || '-') + '</span></div>' +
+      '<div class="jc-row"><b>특이사항</b><span>' + esc(d.note || '-') + '</span></div></div>' +
+      action;
+
+    const rb = $('reqBtn');
+    if(rb) rb.onclick = function(){ requestJob(d); };
+    const vm = $('viewMatch');
+    if(vm) vm.onclick = function(){ showMatchScreen(d.myRid); };
+    if(!quiet) $('dateDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function requestJob(d){
+    const ok = await confirmModal('용차를 의뢰할까요?',
+      kdate(d.date) + ' · ' + post.camp + ' ' + post.route + ' · ' + won(d.price) + '\n의뢰하면 @' + post.owner + '님에게 알림이 전달됩니다.', '의뢰하기');
+    if(!ok) return;
+    try {
+      await api('requestJob', { sid: d.sid });
+      toast('의뢰했습니다. 수락 여부를 알림으로 알려드립니다.', 'ok');
+      openPost(post.postId, d.sid, true);
+    } catch(e){ toast(e.message, 'err'); }
+  }
+</script>
+</body>
+</html>

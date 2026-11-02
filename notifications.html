@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1826">
+<title>알림</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="container">
+  <div id="list"><div class="empty">불러오는 중...</div></div>
+</main>
+
+<script src="common.js"></script>
+<script>
+  const $ = function(id){ return document.getElementById(id); };
+  let items = [], firstLoad = true;
+
+  if(requireLogin()){
+    renderAppbar({ title: '알림', back: true });
+    window.addEventListener('yc:noti-changed', function(){ load(false); });
+    load(true);
+  }
+
+  async function load(markRead){
+    try {
+      const r = await api('notifications');
+      items = r.items || [];
+      render();
+      if(markRead){
+        // 이번 화면에서는 '새 알림' 표시를 유지하고, 서버에는 읽음 처리
+        // (단, 수락/거절이 필요한 대기중 의뢰 알림은 읽음 처리해도 버튼이 유지됩니다)
+        api('markRead', { all: true }).then(function(){ setBadge(0); }).catch(function(){});
+      }
+    } catch(e){ $('list').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+  }
+
+  const LABEL = { request:'용차 의뢰', accepted:'매칭 완료', rejected:'의뢰 결과' };
+
+  function render(){
+    if(!items.length){ $('list').innerHTML = '<div class="empty">알림이 없습니다.</div>'; return; }
+    $('list').innerHTML = items.map(function(n, i){
+      let actions = '';
+      if(n.type === 'request'){
+        if(n.reqStatus === '대기'){
+          actions = '<div class="noti-actions">' +
+            '<button class="btn btn-ghost btn-sm" data-act="detail" data-i="' + i + '">상세</button>' +
+            '<button class="btn btn-danger btn-sm" data-act="reject" data-i="' + i + '">거절하기</button>' +
+            '<button class="btn btn-ok btn-sm" data-act="accept" data-i="' + i + '">수락하기</button></div>';
+        } else {
+          actions = '<div class="noti-actions"><button class="btn btn-ghost btn-sm" data-act="detail" data-i="' + i + '">' +
+            (n.reqStatus === '수락' ? '수락함 · 정보 보기' : n.reqStatus === '거절' ? '처리됨(거절)' : '상세') + '</button></div>';
+        }
+      } else if(n.type === 'accepted'){
+        actions = '<div class="noti-actions"><button class="btn btn-primary btn-sm" data-act="detail" data-i="' + i + '">매칭 정보 보기</button></div>';
+      }
+      return '<div class="card noti ' + (n.read ? '' : 'unread') + '">' +
+        '<div class="noti-top"><span class="tag ' + esc(n.type) + '">' + esc(LABEL[n.type] || '알림') + '</span>' +
+        '<span class="noti-time">' + esc(fmtTime(n.created)) + '</span></div>' +
+        '<div class="noti-msg">' + esc(n.msg) + '</div>' + actions + '</div>';
+    }).join('');
+  }
+
+  $('list').addEventListener('click', async function(e){
+    const b = e.target.closest('[data-act]'); if(!b) return;
+    const n = items[Number(b.dataset.i)]; if(!n) return;
+    const act = b.dataset.act;
+    if(act === 'detail'){ showMatchScreen(n.rid); return; }
+    b.disabled = true;
+    if(act === 'accept'){ if(await respondTo(n.rid, true)) showMatchScreen(n.rid); }
+    else if(act === 'reject'){
+      const ok = await confirmModal('의뢰를 거절할까요?', '거절하면 의뢰자에게 거절 알림이 전달됩니다.', '거절하기');
+      if(ok) await respondTo(n.rid, false); else b.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

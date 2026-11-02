@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1826">
+<title>용차일 등록</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="container">
+
+  <!-- 기본 화면: 아이디 / 캠프 / 라우트 / 단가 카드 -->
+  <div class="card summary">
+    <div class="jc-top">
+      <div class="jc-id"><span class="avatar" id="sAvatar">?</span><span id="sId">@</span></div>
+      <div class="jc-price" id="sPrice">1,100원</div>
+    </div>
+    <div class="jc-row"><b>캠프</b><span id="sCamp">-</span></div>
+    <div class="jc-row"><b>라우트</b><span id="sRoute">-</span></div>
+    <div class="jc-row"><b>날짜</b><span id="sDates">선택 안 함</span></div>
+  </div>
+
+  <div class="h2">용차 날짜 선택</div>
+  <div class="card">
+    <div id="cal"></div>
+    <div class="chips" id="dateChips"></div>
+    <div class="hint">필요한 날짜를 모두 눌러 선택하세요. (여러 날짜 선택 가능)</div>
+  </div>
+
+  <div class="h2">용차 단가</div>
+  <div class="card">
+    <div class="price-line"><span>기본 단가</span><strong>1,100원</strong></div>
+    <div class="price-line">
+      <label class="check"><input type="checkbox" id="jibun"> 지번 배송 <span class="muted small">(+200원)</span></label>
+      <strong id="jibunAmt" class="muted">+0원</strong>
+    </div>
+    <div class="price-line">
+      <label class="check"><input type="checkbox" id="useCustom"> 단가 직접 설정</label>
+    </div>
+    <div class="field" id="customBox" hidden style="margin:8px 0 0">
+      <input type="number" id="customPrice" inputmode="numeric" min="1" max="100000" placeholder="원하는 단가 (원)">
+      <div class="hint">직접 설정하면 위 기본/지번 단가 대신 입력한 금액이 적용됩니다.</div>
+    </div>
+    <div class="price-line"><span>최종 단가</span><span class="price-total" id="finalPrice">1,100원</span></div>
+  </div>
+
+  <div class="h2">배송지 정보</div>
+  <div class="card">
+    <div class="row2">
+      <div class="field"><label for="camp">캠프</label><input type="text" id="camp" maxlength="50"></div>
+      <div class="field"><label for="route">라우트</label><input type="text" id="route" maxlength="50"></div>
+    </div>
+    <div class="field"><label for="parking">주차자리</label><input type="text" id="parking" maxlength="100" placeholder="예: 정문 앞 1번 자리"></div>
+    <div class="field"><label for="tip">배송팁</label><textarea id="tip" maxlength="200" placeholder="예: 3동은 비밀번호 필요, 엘리베이터 우측"></textarea></div>
+    <div class="field" style="margin-bottom:0"><label for="note">특이사항</label><textarea id="note" maxlength="500" placeholder="기사님께 전달할 내용을 적어주세요"></textarea></div>
+  </div>
+</main>
+
+<div class="sticky-bar"><div class="inner">
+  <button class="btn btn-accent btn-block" id="submitBtn">용차일 등록하기</button>
+</div></div>
+
+<script src="common.js"></script>
+<script>
+  const BASE = 1100, JIBUN = 200, MAX = 100000;
+  const $ = function(id){ return document.getElementById(id); };
+  let cal;
+
+  if(requireLogin()){
+    renderAppbar({ title: '용차일 등록', back: true });
+    const u = getUser() || {};
+    $('camp').value = u.camp || '';
+    $('route').value = u.route || '';
+    $('sId').textContent = '@' + (u.id || '');
+    $('sAvatar').textContent = (u.id || '?').charAt(0).toUpperCase();
+
+    cal = Calendar($('cal'), { mode: 'multi', min: todayStr(), onChange: refresh });
+    ['jibun','useCustom','customPrice','camp','route'].forEach(function(id){ $(id).addEventListener('input', refresh); $(id).addEventListener('change', refresh); });
+    $('submitBtn').addEventListener('click', submit);
+    refresh();
+  }
+
+  function currentPrice(){
+    if($('useCustom').checked){
+      const v = parseInt($('customPrice').value, 10);
+      return isNaN(v) ? 0 : v;
+    }
+    return BASE + ($('jibun').checked ? JIBUN : 0);
+  }
+
+  function refresh(){
+    const custom = $('useCustom').checked;
+    $('customBox').hidden = !custom;
+    $('jibun').disabled = custom;
+    $('jibunAmt').textContent = '+' + ($('jibun').checked && !custom ? JIBUN : 0) + '원';
+    const p = currentPrice();
+    $('finalPrice').textContent = p > 0 ? won(p) : '금액 입력';
+    $('sPrice').textContent = p > 0 ? won(p) : '-';
+    $('sCamp').textContent = $('camp').value.trim() || '-';
+    $('sRoute').textContent = $('route').value.trim() || '-';
+
+    const ds = cal ? cal.getSelected() : [];
+    $('sDates').textContent = ds.length ? (ds.length + '일 선택') : '선택 안 함';
+    $('dateChips').innerHTML = ds.map(function(d){ return '<span class="chip">' + esc(shortDate(d)) + '</span>'; }).join('');
+  }
+
+  async function submit(){
+    const dates = cal.getSelected();
+    const camp = $('camp').value.trim(), route = $('route').value.trim();
+    const custom = $('useCustom').checked;
+    const price = currentPrice();
+
+    if(!dates.length){ toast('용차 날짜를 선택하세요.', 'err'); return; }
+    if(!camp || !route){ toast('캠프와 라우트를 입력하세요.', 'err'); return; }
+    if(custom && (price <= 0 || price > MAX)){ toast('단가는 1원 ~ ' + MAX.toLocaleString() + '원 사이로 입력하세요.', 'err'); return; }
+
+    const ok = await confirmModal('용차일을 등록할까요?',
+      dates.length + '일 · ' + camp + ' ' + route + ' · ' + won(price), '등록하기');
+    if(!ok) return;
+
+    const btn = $('submitBtn');
+    btn.disabled = true; btn.textContent = '등록 중...';
+    try {
+      const r = await api('createJob', {
+        dates: dates, camp: camp, route: route,
+        jibun: $('jibun').checked && !custom,
+        customPrice: custom ? price : null,
+        parking: $('parking').value, tip: $('tip').value, note: $('note').value
+      });
+      let msg = r.added + '일이 등록되었습니다. (' + won(r.price) + ')';
+      if(r.skipped && r.skipped.length) msg += ' 이미 등록된 ' + r.skipped.length + '일은 제외했습니다.';
+      const m = openModal('<div class="match-hero"><div class="ok-ico">' + ICON.check + '</div><h3>등록 완료</h3><div class="muted small">' + esc(msg) + '</div></div>' +
+        '<div class="m-actions"><button class="btn btn-ghost" data-go="more">더 등록하기</button><button class="btn btn-primary" data-go="home">홈으로</button></div>', true);
+      m.addEventListener('click', function(e){
+        const b = e.target.closest('[data-go]'); if(!b) return;
+        if(b.dataset.go === 'home') location.href = 'home.html';
+        else { closeModal(); cal.clear(); $('parking').value = ''; $('tip').value = ''; $('note').value = ''; window.scrollTo(0, 0); }
+      });
+    } catch(e){
+      toast(e.message, 'err');
+    } finally {
+      btn.disabled = false; btn.textContent = '용차일 등록하기';
+    }
+  }
+</script>
+</body>
+</html>
