@@ -6,6 +6,11 @@
 <meta name="theme-color" content="#0F1826">
 <title>용차일 등록</title>
 <link rel="stylesheet" href="style.css">
+<style>
+.seg{display:flex;background:#ECEAE2;border-radius:10px;padding:4px;}
+.seg button{flex:1;border:none;background:transparent;padding:11px 4px;font-size:14px;font-weight:700;color:#7A8296;border-radius:7px;cursor:pointer;}
+.seg button.on{background:#0F1826;color:#fff;}
+</style>
 </head>
 <body>
 <main class="container">
@@ -18,14 +23,23 @@
     </div>
     <div class="jc-row"><b>캠프</b><span id="sCamp">-</span></div>
     <div class="jc-row"><b>라우트</b><span id="sRoute">-</span></div>
-    <div class="jc-row"><b>날짜</b><span id="sDates">선택 안 함</span></div>
+    <div class="jc-row"><b>근무</b><span id="sShift">주간</span></div>
+    <div class="jc-row"><b>날짜(PDD)</b><span id="sDates">선택 안 함</span></div>
   </div>
 
-  <div class="h2">용차 날짜 선택</div>
+  <div class="h2">근무 구분</div>
+  <div class="card">
+    <div class="seg" id="shiftSeg">
+      <button type="button" class="on" data-s="주간">주간</button>
+      <button type="button" data-s="야간">야간</button>
+    </div>
+  </div>
+
+  <div class="h2">용차 날짜 선택 <span class="tag request">PDD 기준</span></div>
   <div class="card">
     <div id="cal"></div>
     <div class="chips" id="dateChips"></div>
-    <div class="hint">필요한 날짜를 모두 눌러 선택하세요. (여러 날짜 선택 가능)</div>
+    <div class="hint">날짜는 <b>PDD(배송 예정일) 기준</b>입니다. 필요한 날짜를 모두 눌러 선택하세요. (여러 날짜 선택 가능)</div>
   </div>
 
   <div class="h2">용차 단가</div>
@@ -65,7 +79,7 @@
 <script>
   const BASE = 1100, JIBUN = 200, MAX = 100000;
   const $ = function(id){ return document.getElementById(id); };
-  let cal;
+  let cal, shift = '주간';
 
   if(requireLogin()){
     renderAppbar({ title: '용차일 등록', back: true });
@@ -78,6 +92,12 @@
     cal = Calendar($('cal'), { mode: 'multi', min: todayStr(), onChange: refresh });
     ['jibun','useCustom','customPrice','camp','route'].forEach(function(id){ $(id).addEventListener('input', refresh); $(id).addEventListener('change', refresh); });
     $('submitBtn').addEventListener('click', submit);
+    $('shiftSeg').addEventListener('click', function(e){
+      const b = e.target.closest('button[data-s]'); if(!b) return;
+      shift = b.dataset.s;
+      Array.prototype.forEach.call($('shiftSeg').children, function(x){ x.classList.toggle('on', x === b); });
+      refresh();
+    });
     refresh();
   }
 
@@ -99,6 +119,7 @@
     $('sPrice').textContent = p > 0 ? won(p) : '-';
     $('sCamp').textContent = $('camp').value.trim() || '-';
     $('sRoute').textContent = $('route').value.trim() || '-';
+    $('sShift').textContent = shift;
 
     const ds = cal ? cal.getSelected() : [];
     $('sDates').textContent = ds.length ? (ds.length + '일 선택') : '선택 안 함';
@@ -116,20 +137,20 @@
     if(custom && (price <= 0 || price > MAX)){ toast('단가는 1원 ~ ' + MAX.toLocaleString() + '원 사이로 입력하세요.', 'err'); return; }
 
     const ok = await confirmModal('용차일을 등록할까요?',
-      dates.length + '일 · ' + camp + ' ' + route + ' · ' + won(price), '등록하기');
+      shift + ' · ' + dates.length + '일(PDD 기준) · ' + camp + ' ' + route + ' · ' + won(price), '등록하기');
     if(!ok) return;
 
     const btn = $('submitBtn');
     btn.disabled = true; btn.textContent = '등록 중...';
     try {
       const r = await api('createJob', {
-        dates: dates, camp: camp, route: route,
+        dates: dates, camp: camp, route: route, shift: shift,
         jibun: $('jibun').checked && !custom,
         customPrice: custom ? price : null,
         parking: $('parking').value, tip: $('tip').value, note: $('note').value
       });
-      let msg = r.added + '일이 등록되었습니다. (' + won(r.price) + ')';
-      if(r.skipped && r.skipped.length) msg += ' 이미 등록된 ' + r.skipped.length + '일은 제외했습니다.';
+      let msg = shift + ' ' + r.added + '일이 등록되었습니다. (' + won(r.price) + ')';
+      if(r.skipped && r.skipped.length) msg += ' 같은 근무로 이미 등록된 ' + r.skipped.length + '일은 제외했습니다.';
       const m = openModal('<div class="match-hero"><div class="ok-ico">' + ICON.check + '</div><h3>등록 완료</h3><div class="muted small">' + esc(msg) + '</div></div>' +
         '<div class="m-actions"><button class="btn btn-ghost" data-go="more">더 등록하기</button><button class="btn btn-primary" data-go="home">홈으로</button></div>', true);
       m.addEventListener('click', function(e){
