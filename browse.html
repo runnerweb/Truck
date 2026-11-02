@@ -19,7 +19,7 @@
   <!-- 2) 상세: 달력 → 날짜 클릭 → 자세한 정보 -->
   <section id="detailView" hidden>
     <div class="card" id="postHead"></div>
-    <div class="h2">날짜를 선택하세요</div>
+    <div class="h2">날짜를 선택하세요 <span class="tag request">PDD 기준</span></div>
     <div class="card">
       <div id="cal"></div>
       <div class="legend">
@@ -66,10 +66,11 @@
       const shown = g.dates.slice(0, 4).map(function(d){ return '<span class="chip">' + esc(shortDate(d.date)) + '</span>'; }).join('');
       const more = g.dates.length > 4 ? '<span class="chip more">+' + (g.dates.length - 4) + '일</span>' : '';
       return '<button type="button" class="job-card" data-pid="' + esc(g.postId) + '">' +
-        '<div class="jc-top"><div class="jc-id"><span class="avatar">' + esc(g.owner.charAt(0).toUpperCase()) + '</span>@' + esc(g.owner) + '</div>' +
+        '<div class="jc-top"><div class="jc-id"><span class="avatar">' + esc(g.owner.charAt(0).toUpperCase()) + '</span>@' + esc(g.owner) + (g.mine ? ' <span class="tag request">내 등록</span>' : '') + '</div>' +
         '<div class="jc-price">' + won(g.price) + '</div></div>' +
         '<div class="jc-row"><b>캠프</b><span>' + esc(g.camp) + '</span></div>' +
         '<div class="jc-row"><b>라우트</b><span>' + esc(g.route) + (g.jibun ? ' · 지번' : '') + '</span></div>' +
+        '<div class="jc-row"><b>근무</b><span>' + shiftTag(g.shift) + '</span></div>' +
         '<div class="chips">' + shown + more + '</div></button>';
     }).join('');
   }
@@ -99,7 +100,8 @@
         '<div class="jc-row"><b>아이디</b><span>@' + esc(post.owner) + '</span></div>' +
         '<div class="jc-row"><b>연락처</b><span>' + telLink(post.ownerPhone) + '</span></div>' +
         '<div class="jc-row"><b>캠프</b><span>' + esc(post.camp) + '</span></div>' +
-        '<div class="jc-row"><b>라우트</b><span>' + esc(post.route) + '</span></div></div>';
+        '<div class="jc-row"><b>라우트</b><span>' + esc(post.route) + '</span></div>' +
+        '<div class="jc-row"><b>근무</b><span>' + shiftTag(post.shift) + '</span></div></div>';
 
       const map = {};
       post.dates.forEach(function(d){
@@ -146,12 +148,13 @@
     }
 
     $('dateDetail').innerHTML =
-      '<div class="h2">' + esc(kdate(ds)) + ' 상세 정보</div>' +
+      '<div class="h2">' + esc(kdate(ds)) + ' 상세 정보 <span class="tag request">PDD 기준</span></div>' +
       '<div class="card detail-rows">' +
       '<div class="jc-row"><b>아이디</b><span>@' + esc(post.owner) + '</span></div>' +
       '<div class="jc-row"><b>연락처</b><span>' + telLink(post.ownerPhone) + '</span></div>' +
       '<div class="jc-row"><b>캠프</b><span>' + esc(post.camp) + '</span></div>' +
       '<div class="jc-row"><b>라우트</b><span>' + esc(post.route) + '</span></div>' +
+      '<div class="jc-row"><b>근무</b><span>' + shiftTag(d.shift) + '</span></div>' +
       '<div class="jc-row"><b>단가</b><span><strong>' + won(d.price) + '</strong>' + (d.jibun ? ' (지번 +200원 포함)' : '') + '</span></div>' +
       '<div class="jc-row"><b>주차자리</b><span>' + esc(d.parking || '-') + '</span></div>' +
       '<div class="jc-row"><b>배송팁</b><span>' + esc(d.tip || '-') + '</span></div>' +
@@ -167,7 +170,7 @@
 
   async function requestJob(d){
     const ok = await confirmModal('용차를 의뢰할까요?',
-      kdate(d.date) + ' · ' + post.camp + ' ' + post.route + ' · ' + won(d.price) + '\n의뢰하면 @' + post.owner + '님에게 알림이 전달됩니다.', '의뢰하기');
+      kdate(d.date) + '(PDD) · ' + (d.shift || '주간') + ' · ' + post.camp + ' ' + post.route + ' · ' + won(d.price) + '\n의뢰하면 @' + post.owner + '님에게 알림이 전달됩니다.', '의뢰하기');
     if(!ok) return;
     try {
       await api('requestJob', { sid: d.sid });
