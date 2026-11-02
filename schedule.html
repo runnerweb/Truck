@@ -20,6 +20,13 @@
 .tag.driver{background:var(--success-soft);color:var(--success);}
 .tag.owner{background:var(--amber-soft);color:var(--amber-dark);}
 .tag.done{background:#ECEAE2;color:var(--muted);}
+
+.cal-day.asg{background:var(--success);color:#fff;font-weight:800;}
+.cal-day.wait{background:var(--amber-soft);color:var(--amber-dark);font-weight:800;}
+.sch-card.assigned{border-left:4px solid var(--success);}
+.sch-card.waiting{border-left:4px solid var(--amber);}
+.tag.assigned{background:var(--success);color:#fff;}
+.tag.waiting{background:var(--amber-soft);color:var(--amber-dark);}
 </style>
 </head>
 <body>
@@ -27,14 +34,15 @@
   <div class="seg" id="seg">
     <button type="button" class="on" data-f="all">전체</button>
     <button type="button" data-f="driver">내가 맡은 용차</button>
-    <button type="button" data-f="owner">기사 배정됨</button>
+    <button type="button" data-f="owner">내가 등록한 용차</button>
   </div>
 
   <div class="card">
     <div id="cal"></div>
     <div class="legend">
+      <span><i style="background:var(--success)"></i>배정완료</span>
       <span><i style="background:var(--success-soft)"></i>내가 맡은 용차</span>
-      <span><i style="background:var(--amber-soft)"></i>기사 배정됨</span>
+      <span><i style="background:var(--amber-soft)"></i>기사 모집중</span>
       <span><i style="background:#F1EFE8"></i>지난 일정</span>
     </div>
   </div>
@@ -71,13 +79,15 @@
 
   function visible(){ return all.filter(function(i){ return filter === 'all' || i.role === filter; }); }
 
+  // 날짜 표시 색: 배정완료(asg) > 내가 맡은 용차(requested) > 기사 모집중(wait), 지난 일정은 past
+  function kind(i){ return i.role === 'driver' ? 'requested' : (i.assigned ? 'asg' : 'wait'); }
+  const RANK = { past: 0, wait: 1, requested: 2, asg: 3 };
+
   function dateMap(items){
     const m = {};
     items.forEach(function(i){
-      const past = i.date < today;
-      let cls = past ? 'past' : (i.role === 'driver' ? 'requested' : 'open');
-      if(m[i.date] && !past && m[i.date].cls !== 'past' && m[i.date].cls !== cls) cls = 'requested'; // 같은 날 두 역할이면 '맡은 용차' 색
-      m[i.date] = { cls: cls };
+      const k = i.date < today ? 'past' : kind(i);
+      if(!m[i.date] || RANK[k] > RANK[m[i.date].cls]) m[i.date] = { cls: k };
     });
     return m;
   }
@@ -96,6 +106,12 @@
     renderList();
   }
 
+  function statusTag(i){
+    if(i.date < today) return '<span class="tag done">지난 일정</span>';
+    if(i.role === 'driver') return '<span class="tag driver">내가 맡은 용차</span>';
+    return i.assigned ? '<span class="tag assigned">배정완료</span>' : '<span class="tag waiting">기사 모집중</span>';
+  }
+
   function renderList(){
     const items = visible();
     let rows, title;
@@ -108,21 +124,27 @@
     }
     $('listTitle').textContent = title;
     if(!rows.length){
-      $('list').innerHTML = '<div class="empty">' + (picked ? '이 날짜에는 매칭된 일정이 없습니다.' : '매칭된 일정이 없습니다.<br>용차 의뢰가 수락되면 여기에 표시됩니다.') + '</div>';
+      $('list').innerHTML = '<div class="empty">' + (picked ? '이 날짜에는 일정이 없습니다.' : '표시할 일정이 없습니다.<br>용차일을 등록하거나 의뢰가 수락되면 여기에 표시됩니다.') + '</div>';
       return;
     }
     $('list').innerHTML = rows.map(function(i){
       const driver = i.role === 'driver';
       const c = i.counterpart || {};
-      return '<div class="job-card sch-card" data-rid="' + esc(i.rid) + '">' +
-        '<div class="jc-top"><div class="sch-date">' + esc(kdate(i.date)) + '</div>' +
-        '<span class="tag ' + (i.date < today ? 'done' : i.role) + '">' + (i.date < today ? '지난 일정' : (driver ? '내가 맡은 용차' : '기사 배정됨')) + '</span></div>' +
+      const cls = driver ? '' : (i.assigned ? ' assigned' : ' waiting');
+      let who;
+      if(i.assigned){
+        who = '<div class="jc-row"><b>' + (driver ? '요청자' : '배정 기사') + '</b><span>@' + esc(c.id) + (c.name ? ' · ' + esc(c.name) : '') + '</span></div>' +
+              '<div class="jc-row"><b>연락처</b><span>' + telLink(c.phone) + '</span></div>';
+      } else {
+        who = '<div class="jc-row"><b>배정 기사</b><span class="muted">' + (i.pending > 0 ? '아직 없음 · 의뢰 ' + i.pending + '건 응답 대기' : '아직 없음 · 의뢰 대기중') + '</span></div>';
+      }
+      return '<div class="job-card sch-card' + cls + '" data-rid="' + esc(i.rid) + '" data-pending="' + (i.pending || 0) + '">' +
+        '<div class="jc-top"><div class="sch-date">' + esc(kdate(i.date)) + '</div>' + statusTag(i) + '</div>' +
         '<div class="jc-row"><b>근무</b><span>' + shiftTag(i.shift) + ' <span class="muted small">PDD 기준</span></span></div>' +
         '<div class="jc-row"><b>캠프</b><span>' + esc(i.camp) + '</span></div>' +
         '<div class="jc-row"><b>라우트</b><span>' + esc(i.route) + '</span></div>' +
         '<div class="jc-row"><b>단가</b><span><strong>' + won(i.price) + '</strong>' + (i.jibun ? ' (지번 포함)' : '') + '</span></div>' +
-        '<div class="jc-row"><b>' + (driver ? '요청자' : '용차 기사') + '</b><span>@' + esc(c.id) + (c.name ? ' · ' + esc(c.name) : '') + '</span></div>' +
-        '<div class="jc-row"><b>연락처</b><span>' + telLink(c.phone) + '</span></div>' +
+        who +
         '<div class="jc-row"><b>주차자리</b><span>' + esc(i.parking || '-') + '</span></div>' +
         '</div>';
     }).join('');
@@ -130,8 +152,9 @@
 
   $('list').addEventListener('click', function(e){
     if(e.target.closest('a')) return; // 전화 링크는 그대로 동작
-    const c = e.target.closest('.sch-card'); if(!c || !c.dataset.rid) return;
-    showMatchScreen(c.dataset.rid);
+    const c = e.target.closest('.sch-card'); if(!c) return;
+    if(c.dataset.rid){ showMatchScreen(c.dataset.rid); }
+    else if(Number(c.dataset.pending) > 0){ location.href = 'notifications.html'; }
   });
 </script>
 </body>
