@@ -1,7 +1,7 @@
 /* ===== 용차 매칭 - 공통 스크립트 ===== */
 
 // ⚠️ Apps Script 웹앱 배포 후 나오는 URL 로 교체하세요. (이 파일 한 곳만 수정하면 전체 페이지에 적용)
-const API_URL = "https://script.google.com/macros/s/AKfycbzkz1AJ9Xf8PR8hbts_tAdZKKaQwpR4tcuDfB8kz-DQUsa-w3e7sNL3oWENyKKgpVBDbQ/exec";
+const API_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 
 const TOKEN_KEY = 'yc_token';
 const USER_KEY = 'yc_user';
@@ -142,6 +142,7 @@ function openMenu(){
     '<div class="m-actions" style="flex-direction:column">' +
     '<a class="btn btn-ghost" href="home.html">홈</a>' +
     '<a class="btn btn-ghost" href="schedule.html">내 스케줄</a>' +
+    (u.isAdmin ? '<a class="btn btn-ghost" href="admin.html">관리자</a>' : '') +
     '<button class="btn btn-danger" id="logoutBtn">로그아웃</button></div>');
   m.querySelector('#logoutBtn').onclick = async function(){
     try { await api('logout'); } catch(e){}
