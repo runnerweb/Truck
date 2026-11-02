@@ -117,6 +117,7 @@
       return '<div class="job-card sch-card" data-rid="' + esc(i.rid) + '">' +
         '<div class="jc-top"><div class="sch-date">' + esc(kdate(i.date)) + '</div>' +
         '<span class="tag ' + (i.date < today ? 'done' : i.role) + '">' + (i.date < today ? '지난 일정' : (driver ? '내가 맡은 용차' : '기사 배정됨')) + '</span></div>' +
+        '<div class="jc-row"><b>근무</b><span>' + shiftTag(i.shift) + ' <span class="muted small">PDD 기준</span></span></div>' +
         '<div class="jc-row"><b>캠프</b><span>' + esc(i.camp) + '</span></div>' +
         '<div class="jc-row"><b>라우트</b><span>' + esc(i.route) + '</span></div>' +
         '<div class="jc-row"><b>단가</b><span><strong>' + won(i.price) + '</strong>' + (i.jibun ? ' (지번 포함)' : '') + '</span></div>' +
